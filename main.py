@@ -3,11 +3,13 @@ from config import  API
 import logging
 
 import asyncio
-from aiogram import Bot, Dispatcher, F , types
+from aiogram import Bot, Dispatcher, F
+from app.handlers import storage
+
 
 
 bot = Bot(API)
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 
 
 async def main() -> None:
