@@ -2,3 +2,4 @@
 /myenv/
 *.dll
 *.lib
+config.py
