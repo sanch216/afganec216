@@ -12,10 +12,7 @@ router = Router()
 #------------------------------------------------------------------
 # Импорты для распознавания и обработки голосового сообщения
 from pydub import AudioSegment
-# import torchaudio
 import torch
-# import speech_recognition as sr
-# import sounddevice as sd
 import whisper
 from speaks import speak
 
@@ -26,11 +23,10 @@ import datetime
 import webbrowser
 import wikipedia
 import requests
-# import math
-
+import json
+from pathlib import Path
 #------------------------------------------------
 
-global user_city
 
 
 #------------------------------------------------
@@ -44,7 +40,7 @@ storage = MemoryStorage()
 #Waiting Class shits
 #
 class DialogStates(StatesGroup):
-    waiting_for_user_city= State()
+    waiting_for_city= State()
     waiting_for_tg_path = State()
 
 #Commands КОМАНДЫ
@@ -69,27 +65,92 @@ async def cmdWork(message: Message) -> None:
 async def settingsWork(message: Message) -> None:
     await message.reply('Выберите пункт: ',reply_markup=kb.settings)
 
-@router.message(Command('mycity'))
-async def cmdCity(message: Message,state: FSMContext) -> None:
-    await message.reply('Напишите ваш город: ')
-    await state.set_state(DialogStates.waiting_for_user_city)
 
-@router.message(DialogStates.waiting_for_user_city)
-async def userCity(message: Message,state: FSMContext):
-    user_city = message.text
-    await state.clear()
-    await message.reply(f'Ваш город, {user_city} , успешно сохранен!')
+# Хендлер для команды /mycity
+@router.message(Command("mycity"))
+async def cmd_mycity(message: Message, state: FSMContext):
+    await message.reply("Напишите ваш город:")
+    await state.set_state(DialogStates.waiting_for_city)
 
-@router.message(Command('info'))
-async def info(message: Message):
-    await message.reply(f'ваш город: {user_city}')
+# Хендлер для обработки ввода города
+@router.message(DialogStates.waiting_for_city)
+async def save_city(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    city = message.text
+    save_user_city(user_id, city)  # Сохраняем данные в JSON
+    await message.reply(f"Ваш город, {city}, успешно сохранён!")
+    await state.clear()  # Сбрасываем состояние
+
+# Хендлер для команды /info
+@router.message(Command("info"))
+async def cmd_info(message: Message):
+    user_id = message.from_user.id
+    city = get_user_city(user_id)
+    if city:
+        await message.reply(f"Ваш город: {city}")
+    else:
+        await message.reply("Город не указан. Установите его командой /mycity.")
+
+# Хендлер для команды /cancel
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is None:
+        await message.reply("Вы не находитесь в активном состоянии.")
+    else:
+        await state.clear()
+        await message.reply("Вы отменили ввод города.")
+
+#------------------------------------------------------------------
+# СОХРАНЕНИЕ/ОБНОВЛЕНИЕ/ХРАНЕНИЕ ДАННЫХ ПОЛЬЗОВАТЕЛЯ В JSON
+DATA_FILE = Path("user_data.json")
+
+
+# Функция для загрузки данных из файла
+def load_data():
+    if DATA_FILE.exists():
+        with open(DATA_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+    return {}  # Если файл не существует, возвращаем пустой словарь
+
+
+# Функция для сохранения данных в файл
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
+
+
+# Сохранение города пользователя
+def save_user_city(user_id, city):
+    data = load_data()
+    data[str(user_id)] = {"city": city}
+    save_data(data)
+
+
+# Получение города пользователя
+def get_user_city(user_id):
+    data = load_data()
+    return data.get(str(user_id), {}).get("city")
+
+
+# Проверка удаления данных
+def delete_user_data(user_id):
+    data = load_data()
+    if str(user_id) in data:
+        del data[str(user_id)]
+        save_data(data)
+
+#------------------------------------------------------------------
+
+
 
 # Voice to text
 
 #------------------------------------------------------------------
 
 device = "cpu"
-# ispolzuem model ot openai (whisper)
+# УКАЗЫВАЕМ МОДЕЛЬ WHISPER'а КОТОРЫЙ БУДЕТ РАСПОЗНАВАТЬ ГОЛОС. СООБЩ.
+
 model = torch.hub.load("openai/whisper", "small", device=device,trust_repo=True)
 
 #------------------------------------------------------------------
@@ -110,10 +171,9 @@ def clr_text(text):
     return clean_text
 #------------------------------------------------------------------
 # ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ О ПОГОДЕ
-def get_weather():
+def get_weather(city):
     try:
         api_key = "b848c93f481c83de598e354f5f490f7d"
-        city = "Бишкек"
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
         response = requests.get(url).json()
 
@@ -182,30 +242,53 @@ async def handle_voice(message: Message):
             triggered_variant = next((variant for variant in variants if cmd_text.startswith(variant)), None)
             if triggered_variant:
                 command_found = True
-
+                #----------------------
+                # КАКАЯ ПОГОДА
                 if command == 'погода':
-                    weather = get_weather()
-                    await message.reply(weather if weather else "Не удалось получить данные о погоде.")
+                    user_id = message.from_user.id
+                    city = get_user_city(user_id)
+                    if city:
+                        weather = get_weather(city)
+                        await message.reply(weather)
+                    else:
+                        await message.reply("Город не указан. Напишите ваш город командой /mycity.")
+                #----------------------
 
+
+                #----------------------
+                # СКОЛЬКО ВРЕМЯ
                 elif command == 'время':
                     current_time = datetime.datetime.now().strftime("%H:%M:%S")
                     await message.reply(f'Текущее время: {current_time}')
 
-                elif command == 'что такое':
-                    search_query = cmd_text.replace(triggered_variant, "").strip()
-                    if search_query:
-                        try:
-                            summary = wikipedia.summary(search_query, sentences=2, lang='ru')
-                            await message.reply(summary)
-                        except wikipedia.exceptions.DisambiguationError as e:
-                            await message.reply(f"Слишком много вариантов: {e.options[:5]}")
-                        except wikipedia.exceptions.PageError:
-                            await message.reply("Страница не найдена.")
-                        except Exception as e:
-                            await message.reply(f"Ошибка: {str(e)}")
-                    else:
-                        await message.reply("Укажите, что искать.")
+                #----------------------
 
+
+                #----------------------
+                # ЧТО ТАКОЕ ...
+
+                elif command == 'что такое':
+                    q = txt
+                    webbrowser.open('http://www.google.com/search?q=' + q)
+
+                    # search_query = cmd_text.replace(triggered_variant, "").strip()
+                    # if search_query:
+                    #     try:
+                    #         summary = wikipedia.summary(search_query, sentences=2, lang='ru')
+                    #         await message.reply(summary)
+                    #     except wikipedia.exceptions.DisambiguationError as e:
+                    #         await message.reply(f"Слишком много вариантов: {e.options[:5]}")
+                    #     except wikipedia.exceptions.PageError:
+                    #         await message.reply("Страница не найдена.")
+                    #     except Exception as e:
+                    #         await message.reply(f"Ошибка: {str(e)}")
+                    # else:
+                    #     await message.reply("Укажите, что искать.")
+                #----------------------
+
+
+                #----------------------
+                # ОТКРОЙ САЙТ
                 elif command == 'открой сайт':
 
                     url = cmd_text.replace(triggered_variant, "").strip()
@@ -213,6 +296,10 @@ async def handle_voice(message: Message):
                         url = f"http://{url}.com"
                     webbrowser.open(url)
                     await message.reply(f'Открываю сайт: {url}')
+                #----------------------
+
+                #----------------------
+                # ОТКРОЙ ТГ
 
                 elif command == 'открой телеграмм':
                     try:
@@ -220,6 +307,7 @@ async def handle_voice(message: Message):
                         await message.reply('Открываю Telegram.')
                     except Exception as e:
                         await message.reply(f"Ошибка: {str(e)}")
+                #----------------------
 
                 break
 
