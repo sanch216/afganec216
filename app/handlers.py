@@ -5,7 +5,6 @@ from aiogram import F, Router
 from aiogram.types import Message, ContentType , Voice
 from commands import COMMANDS
 import app.keyboards as kb
-# import types
 
 router = Router()
 
@@ -41,7 +40,6 @@ storage = MemoryStorage()
 #
 class DialogStates(StatesGroup):
     waiting_for_city= State()
-    waiting_for_tg_path = State()
 
 #Commands КОМАНДЫ
 #------------------------------------------------------------------
@@ -67,7 +65,7 @@ async def settingsWork(message: Message) -> None:
 
 
 # Хендлер для команды /mycity
-@router.message(Command("mycity"))
+@router.message(Command("setcity"))
 async def cmd_mycity(message: Message, state: FSMContext):
     await message.reply("Напишите ваш город:")
     await state.set_state(DialogStates.waiting_for_city)
@@ -91,15 +89,6 @@ async def cmd_info(message: Message):
     else:
         await message.reply("Город не указан. Установите его командой /mycity.")
 
-# Хендлер для команды /cancel
-@router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: FSMContext):
-    current_state = await state.get_state()
-    if current_state is None:
-        await message.reply("Вы не находитесь в активном состоянии.")
-    else:
-        await state.clear()
-        await message.reply("Вы отменили ввод города.")
 
 #------------------------------------------------------------------
 # СОХРАНЕНИЕ/ОБНОВЛЕНИЕ/ХРАНЕНИЕ ДАННЫХ ПОЛЬЗОВАТЕЛЯ В JSON
@@ -169,6 +158,31 @@ def clr_text(text):
     pattern = r'[А-Яа-яA-Za-z0-9\s]'
     clean_text = ''.join(re.findall(pattern, text))
     return clean_text
+#------------------------------------------------------------------
+# СОЗДАТЬ ЗАМЕТКУ
+NOTES_FILE = Path("notes.json")
+
+def save_note_to_file(user_id, note_content):
+    notes = load_notes()
+    if str(user_id) not in notes:
+        notes[str(user_id)] = []
+    notes[str(user_id)].append({
+        "content": note_content,
+        "timestamp": datetime.datetime.now().isoformat()
+    })
+    save_notes(notes)
+
+def load_notes():
+    if NOTES_FILE.exists():
+        with open(NOTES_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+    return {}
+
+def save_notes(notes):
+    with open(NOTES_FILE, "w", encoding="utf-8") as file:
+        json.dump(notes, file, indent=4, ensure_ascii=False)
+
+
 #------------------------------------------------------------------
 # ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ О ПОГОДЕ
 def get_weather(city):
@@ -251,9 +265,45 @@ async def handle_voice(message: Message):
                         weather = get_weather(city)
                         await message.reply(weather)
                     else:
-                        await message.reply("Город не указан. Напишите ваш город командой /mycity.")
+                        await message.reply("Город не указан. Напишите ваш город командой /setcity.")
                 #----------------------
 
+                elif command == 'запиши заметку':
+
+                    note_content = cmd_text.replace(triggered_variant, "").strip()  # Убираем текст команды
+
+                    if note_content:
+
+                        save_note_to_file(message.from_user.id, note_content)
+
+                        await message.reply(f'Заметка сохранена: "{note_content}"')
+
+                    else:
+
+                        await message.reply("Текст заметки пуст. Попробуйте снова.")
+
+
+                elif command == "покажи заметки":
+
+                    notes = load_notes()
+
+                    user_notes = notes.get(str(message.from_user.id), [])
+
+                    if user_notes:
+
+                        response = "Ваши заметки:\n" + "\n\n".join(
+
+                            [f"{idx + 1}. {note['content']} (дата: {note['timestamp']})"
+
+                             for idx, note in enumerate(user_notes)]
+
+                        )
+
+                        await message.reply(response)
+
+                    else:
+
+                        await message.reply("У вас пока нет сохранённых заметок.")
 
                 #----------------------
                 # СКОЛЬКО ВРЕМЯ
@@ -271,19 +321,6 @@ async def handle_voice(message: Message):
                     q = txt
                     webbrowser.open('http://www.google.com/search?q=' + q)
 
-                    # search_query = cmd_text.replace(triggered_variant, "").strip()
-                    # if search_query:
-                    #     try:
-                    #         summary = wikipedia.summary(search_query, sentences=2, lang='ru')
-                    #         await message.reply(summary)
-                    #     except wikipedia.exceptions.DisambiguationError as e:
-                    #         await message.reply(f"Слишком много вариантов: {e.options[:5]}")
-                    #     except wikipedia.exceptions.PageError:
-                    #         await message.reply("Страница не найдена.")
-                    #     except Exception as e:
-                    #         await message.reply(f"Ошибка: {str(e)}")
-                    # else:
-                    #     await message.reply("Укажите, что искать.")
                 #----------------------
 
 
@@ -309,6 +346,7 @@ async def handle_voice(message: Message):
                         await message.reply(f"Ошибка: {str(e)}")
                 #----------------------
 
+
                 break
 
         if not command_found:
@@ -317,50 +355,4 @@ async def handle_voice(message: Message):
     except Exception as e:
         await message.reply(f"Ошибка распознавания: {str(e)}")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# if cmd_text.startswith("запиши заметку"):
-        #     note_content = txt[15:].strip()  # Убираем "Запиши заметку"
-        #     print(f"NOTE CONTENT: {note_content}")
-        #     if note_content:
-        #         with open("notes.txt", "a", encoding="utf-8") as file:
-        #             file.write(f"{note_content}\n")
-        #         await message.reply(f"Заметка сохранена: {note_content}")
-        #         speak('заметка сохранена',language='ru')
-        #     else:
-        #         await message.reply("Текст заметки пуст. Попробуйте снова.")
-        # else:
-        #     await message.reply("Команда не распознана. Попробуйте снова.")
         

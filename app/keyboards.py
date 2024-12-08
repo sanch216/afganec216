@@ -5,7 +5,6 @@ main = ReplyKeyboardMarkup(keyboard = [
 ], resize_keyboard = True, input_field_placeholder = 'Выберите пункт...')
 
 settings = ReplyKeyboardMarkup(keyboard = [
-    [KeyboardButton(text = '/mycity'), KeyboardButton(text = '/path'), KeyboardButton(text = '/info'), KeyboardButton(text='/cancel')],
+    [KeyboardButton(text = '/setcity'), KeyboardButton(text = '/info')],
 ], resize_keyboard = True, input_field_placeholder = 'Выберите пункт...')
 
-# settings.add()
