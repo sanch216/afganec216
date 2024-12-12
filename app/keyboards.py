@@ -1,4 +1,4 @@
-from aiogram.types import ReplyKeyboardRemove,ReplyKeyboardMarkup,KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import ReplyKeyboardMarkup,KeyboardButton
 
 main = ReplyKeyboardMarkup(keyboard = [
     [KeyboardButton(text = '/work'), KeyboardButton(text = '/help'), KeyboardButton(text = '/settings')],
