@@ -1,10 +1,13 @@
-from config import  API
+from dotenv import load_dotenv
+import os
 
 import logging
 
 import asyncio
 from aiogram import Bot, Dispatcher, F
 from app.handlers import storage
+load_dotenv()
+API = os.getenv("tg_api")
 bot = Bot(API)
 dp = Dispatcher(storage=storage)
 

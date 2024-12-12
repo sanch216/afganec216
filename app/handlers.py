@@ -6,6 +6,8 @@ from aiogram.types import Message, ContentType , Voice
 from commands import COMMANDS
 import app.keyboards as kb
 
+from dotenv import load_dotenv
+
 router = Router()
 
 #------------------------------------------------------------------
@@ -187,7 +189,8 @@ def save_notes(notes):
 # ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ О ПОГОДЕ
 def get_weather(city):
     try:
-        api_key = "b848c93f481c83de598e354f5f490f7d"
+        load_dotenv()
+        api_key = os.getenv("weather_api")
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
         response = requests.get(url).json()
 
