@@ -37,18 +37,23 @@ async def cmdStart(message: Message) -> None:
 # Help
 @router.message(Command('help'))
 async def cmdHelp(message: Message) -> None:
-    await message.answer('Вот список команд, которые вы можете использовать:\n/start - запуск бота\n/help - получить помощь\n/work - запуск программы')
+    await message.answer('Вот список команд, которые вы можете использовать:\n/start - запуск бота\n/help - получить помощь\n/commands - показать команды \n/work - запуск программы\n/settings - перейти в настройки\n/setcity - указать город\n/info - узнать какой город выбран')
 
 # Work
 @router.message(Command('work'))
 async def cmdWork(message: Message) -> None:
     await message.reply('Отправьте голосове сообщение: ')
-    # await state.set_state(DialogStates.waiting_for_voice_msg)
 
 # Settings
 @router.message(Command('settings'))
 async def settingsWork(message: Message) -> None:
     await message.reply('Выберите пункт: ',reply_markup=kb.settings)
+
+@router.message(Command('commands'))
+async def cmdWork(message: Message) -> None:
+    await message.reply("""
+    Вот список голосовых команд:
+    1) время - """)
 
 
 # Хендлер для команды /mycity
@@ -77,30 +82,9 @@ async def cmd_info(message: Message):
         await message.reply("Город не указан. Установите его командой /mycity.")
 
 #------------------------------------------------------------------
-# ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ О ПОГОДЕ
-def get_weather(city):
-    try:
-        load_dotenv()
-        api_key = os.getenv("weather_api")
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
-        response = requests.get(url).json()
+DATA_FILE = Path("userData.json")
 
-        # Проверяем, удалось ли получить данные
-        if response.get('cod') != 200:
-            return f"Ошибка: {response.get('message', 'Неизвестная ошибка')}"
-
-        weather = response['weather'][0]['description']
-        temp = response['main']['temp']
-        return f'Погода в {city}: {weather}, температура {temp}°C'
-    except Exception as e:
-        return f"Не удалось получить данные о погоде. Ошибка: {e}"
-
-#------------------------------------------------------------------
 # СОХРАНЕНИЕ/ОБНОВЛЕНИЕ/ХРАНЕНИЕ ДАННЫХ ПОЛЬЗОВАТЕЛЯ В JSON
-DATA_FILE = Path("notes.json")
-
-
-# Функция для загрузки данных из файла
 def load_data():
     if DATA_FILE.exists():
         with open(DATA_FILE, "r", encoding="utf-8") as file:
@@ -108,36 +92,38 @@ def load_data():
     return {}  # Если файл не существует, возвращаем пустой словарь
 
 
-# Функция для сохранения данных в файл
+# Функция для загрузки данных из файла
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4, ensure_ascii=False)
 
 
-# Сохранение города пользователя
+# Функция для сохранения данных в файл
 def save_user_city(user_id, city):
     data = load_data()
     data[str(user_id)+'city'] = {"city": city}
     save_data(data)
 
 
-# Получение города пользователя
+# Сохранение города пользователя
 def get_user_city(user_id):
     data = load_data()
     return data.get(str(user_id)+'city', {}).get('city')
 
 
-# Проверка удаления данных
+# Получение города пользователя
 def delete_user_data(user_id):
     data = load_data()
     if str(user_id) in data:
         del data[str(user_id)]
         save_data(data)
 
+
+# Проверка удаления данных
+NOTES_FILE = Path("userData.json")
+
 #------------------------------------------------------------------
 # СОЗДАТЬ ЗАМЕТКУ
-NOTES_FILE = Path("notes.json")
-
 def save_note_to_file(user_id, note_content):
     notes = load_notes()
     if str(user_id) not in notes:
@@ -158,7 +144,6 @@ def save_notes(notes):
     with open(NOTES_FILE, "w", encoding="utf-8") as file:
         json.dump(notes, file, indent=4, ensure_ascii=False)
 
-
 def show_notes(user_id):
     notes = load_notes()
     user_notes = notes.get(str(user_id), [])
@@ -173,6 +158,7 @@ def show_notes(user_id):
 
     return notes_output
 
+
 def delete_note(user_id, note_index):
     notes = load_notes()
     user_notes = notes.get(user_id, [])
@@ -183,5 +169,24 @@ def delete_note(user_id, note_index):
         save_notes(notes)  # Сохраняем изменения в файл
         return True
     return False
+
+# ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ДАННЫХ О ПОГОДЕ
+def get_weather(city):
+    try:
+        load_dotenv()
+        api_key = os.getenv("weather_api")
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric&lang=ru"
+        response = requests.get(url).json()
+
+        # Проверяем, удалось ли получить данные
+        if response.get('cod') != 200:
+            return f"Ошибка: {response.get('message', 'Неизвестная ошибка')}"
+
+        weather = response['weather'][0]['description']
+        temp = response['main']['temp']
+        return f'Погода в {city}: {weather}, температура {temp}°C'
+    except Exception as e:
+        return f"Не удалось получить данные о погоде. Ошибка: {e}"
+
 
 
